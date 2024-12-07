@@ -4,7 +4,10 @@
  * @email ahmet.altun60@gmail.com
  * @since 07/12/2024
  */
-export interface IApiResponse {
-	success: boolean
-	timestamp: string
+
+export enum LogLevel {
+	ERROR = 'error',
+	WARN = 'warn',
+	INFO = 'info',
+	DEBUG = 'debug',
 }

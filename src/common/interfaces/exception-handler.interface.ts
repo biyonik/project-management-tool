@@ -5,8 +5,8 @@
  * @since 07/12/2024
  */
 
-import { ErrorResponse } from '../dto/error-response.dto';
+import { ErrorResponse } from '../dto/error-response.dto'
 
 export interface ExceptionHandlerFunction {
-  (exception: Error): ErrorResponse;
+	(exception: Error): ErrorResponse
 }

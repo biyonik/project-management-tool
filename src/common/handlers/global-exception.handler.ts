@@ -1,66 +1,102 @@
-/* @author Ahmet Altun
+/**
+ * @author Ahmet Altun
  * @version 1.0
  * @email ahmet.altun60@gmail.com
  * @since 07/12/2024
  */
+import {
+	ExceptionFilter,
+	Catch,
+	ArgumentsHost,
+	HttpException,
+} from '@nestjs/common'
+import { Request, Response } from 'express'
+import { LoggerService } from '../services/logger.service'
+import { ConfigService } from '@nestjs/config'
+import { LogLevel } from '../enums/log-level.enum'
+import { ErrorResponse } from '../dto/error-response.dto'
+import { BaseException } from '../exceptions/base.exception'
+import { ExceptionHandlerRegistry } from '../services/exception-handler.registry'
 
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { ValidationError } from 'class-validator';
-import { BusinessException } from '../exceptions/business-exception';
-import { ExceptionHandler } from '../decorators/exception-handlers';
-import { ErrorResponse } from '../dto/error-response.dto';
-import { ValidationException } from '../exceptions/validation-exception';
+@Catch()
+export class GlobalExceptionFilter implements ExceptionFilter {
+	constructor(
+		private readonly logger: LoggerService,
+		private readonly config: ConfigService,
+		private readonly exceptionHandlerRegistry: ExceptionHandlerRegistry,
+	) {}
 
-@Injectable()
-export class GlobalExceptionHandlers {
-  @ExceptionHandler(BusinessException)
-  handleBusinessException(exception: BusinessException): ErrorResponse {
-    return ErrorResponse.of(
-      exception.code,
-      exception.message,
-      exception.details,
-    );
-  }
+	catch(exception: Error, host: ArgumentsHost) {
+		const ctx = host.switchToHttp()
+		const response = ctx.getResponse<Response>()
+		const request = ctx.getRequest<Request>()
 
-  @ExceptionHandler(ValidationException)
-  handleValidationException(exception: ValidationException): ErrorResponse {
-    return ErrorResponse.of(
-      'VALIDATION_ERROR',
-      exception.message,
-      this.formatValidationErrors(exception.errors),
-    );
-  }
+		// Request context'i
+		const requestContext = {
+			method: request.method,
+			url: request.url,
+			ip: request.ip,
+			userId: request.user?.id, // TODO: Implement auth middleware
+			correlationId: request.headers['x-correlation-id'],
+			userAgent: request.headers['user-agent'],
+		}
 
-  @ExceptionHandler(NotFoundException)
-  handleNotFoundException(exception: NotFoundException): ErrorResponse {
-    return ErrorResponse.of('NOT_FOUND', exception.message);
-  }
+		// Custom handler'ı kontrol et
+		const handler = this.exceptionHandlerRegistry.getHandler(exception)
+		if (handler) {
+			const errorResponse = handler(exception)
+			const baseException = exception as BaseException
 
-  private formatValidationErrors(errors: ValidationError[]): any[] {
-    return errors.map((error) => ({
-      field: error.property,
-      message: this.getErrorMessages(error),
-      value: error.value,
-      constraints: error.constraints,
-      children: error.children?.length
-        ? this.formatValidationErrors(error.children)
-        : undefined,
-    }));
-  }
+			this.logger.log(
+				baseException.logLevel,
+				baseException.message,
+				exception,
+				{ ...requestContext, errorResponse },
+			)
 
-  private getErrorMessages(error: ValidationError): string {
-    const messages: string[] = [];
+			return response.status(baseException.statusCode).json(errorResponse)
+		}
 
-    if (error.constraints) {
-      messages.push(...Object.values(error.constraints));
-    }
+		// Built-in HTTP exception'ları için
+		if (exception instanceof HttpException) {
+			const status = exception.getStatus()
+			const errorResponse = ErrorResponse.of(
+				'HTTP_ERROR',
+				exception.message,
+				this.config.get('NODE_ENV') === 'development'
+					? exception.stack
+					: undefined,
+			)
 
-    if (error.children) {
-      for (const child of error.children) {
-        messages.push(this.getErrorMessages(child));
-      }
-    }
+			this.logger.log(LogLevel.ERROR, exception.message, exception, {
+				...requestContext,
+				errorResponse,
+			})
 
-    return messages.join(', ');
-  }
+			return response.status(status).json(errorResponse)
+		}
+
+		// Beklenmeyen hatalar için
+		const errorResponse = ErrorResponse.of(
+			'INTERNAL_SERVER_ERROR',
+			this.config.get('NODE_ENV') === 'production'
+				? 'An unexpected error occurred'
+				: exception.message,
+			this.config.get('NODE_ENV') === 'development'
+				? exception.stack
+				: undefined,
+		)
+
+		this.logger.log(LogLevel.ERROR, 'Unhandled exception', exception, {
+			...requestContext,
+			errorResponse,
+		})
+
+		// Kritik hatalar için notification service'e bildirim gönder
+		if (this.config.get('NODE_ENV') === 'production') {
+			// NotificationService.notify('Critical Error', exception);
+		}
+
+		return response.status(500).json(errorResponse)
+	}
 }

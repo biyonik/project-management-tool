@@ -5,22 +5,22 @@
  * @since 07/12/2024
  */
 
-export const EXCEPTION_HANDLER_METADATA = 'EXCEPTION_HANDLER_METADATA';
+export const EXCEPTION_HANDLER_METADATA = 'EXCEPTION_HANDLER_METADATA'
 
-type ExceptionType = new (...args: any[]) => Error;
+type ExceptionType = new (...args: any[]) => Error
 
 export function ExceptionHandler(exceptionType: ExceptionType) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor,
-  ) {
-    Reflect.defineMetadata(
-      EXCEPTION_HANDLER_METADATA,
-      exceptionType,
-      target,
-      propertyKey,
-    );
-    return descriptor;
-  };
+	return function (
+		target: any,
+		propertyKey: string,
+		descriptor: PropertyDescriptor,
+	) {
+		Reflect.defineMetadata(
+			EXCEPTION_HANDLER_METADATA,
+			exceptionType,
+			target,
+			propertyKey,
+		)
+		return descriptor
+	}
 }

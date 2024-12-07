@@ -6,8 +6,8 @@
  */
 
 export interface ValidationError {
-  field: string;
-  message: string;
-  value?: any;
-  constraints?: { [type: string]: string }; // Tip tanımını düzelttik
+	field: string
+	message: string
+	value?: any
+	constraints?: { [type: string]: string } // Tip tanımını düzelttik
 }
