@@ -1,11 +1,13 @@
 import { Module, OnModuleInit } from '@nestjs/common'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
-import { GlobalExceptionHandlers } from 'src/common/handlers/global-exception.handler'
 import { ExceptionHandlerRegistry } from 'src/common/services/exception-handler.registry'
 import { GlobalExceptionFilter } from 'src/common/filters/global-exception.filter'
 import { APP_FILTER, ModuleRef } from '@nestjs/core'
 import { EXCEPTION_HANDLER_METADATA } from 'src/common/decorators/exception-handlers'
+import { GlobalExceptionHandlers } from 'src/common/handlers/global-exception.handler'
+import { LoggerService } from 'src/common/services/logger.service'
+import { ConfigService } from '@nestjs/config'
 
 @Module({
 	imports: [],
@@ -17,6 +19,8 @@ import { EXCEPTION_HANDLER_METADATA } from 'src/common/decorators/exception-hand
 		},
 		ExceptionHandlerRegistry,
 		GlobalExceptionHandlers,
+		LoggerService,
+		ConfigService,
 		AppService,
 	],
 })

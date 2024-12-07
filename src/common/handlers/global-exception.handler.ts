@@ -19,7 +19,7 @@ import { BaseException } from '../exceptions/base.exception'
 import { ExceptionHandlerRegistry } from '../services/exception-handler.registry'
 
 @Catch()
-export class GlobalExceptionFilter implements ExceptionFilter {
+export class GlobalExceptionHandlers implements ExceptionFilter {
 	constructor(
 		private readonly logger: LoggerService,
 		private readonly config: ConfigService,
