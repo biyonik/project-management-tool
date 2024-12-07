@@ -7,10 +7,58 @@ import { APP_FILTER, ModuleRef } from '@nestjs/core'
 import { EXCEPTION_HANDLER_METADATA } from 'src/common/decorators/exception-handlers'
 import { GlobalExceptionHandlers } from 'src/common/handlers/global-exception.handler'
 import { LoggerService } from 'src/common/services/logger.service'
-import { ConfigService } from '@nestjs/config'
+import { ConfigModule, ConfigService } from '@nestjs/config'
+import { AuthModule } from '../auth/auth.module'
+import { DatabaseModule } from '../database/database.module'
+import { UserModule } from '../user/user.module'
+import { RoleModule } from '../role/role.module'
+import { ProjectModule } from '../project/project.module'
+import { TaskModule } from '../task/task.module'
+import * as Joi from 'joi'
 
 @Module({
-	imports: [],
+	imports: [
+		AuthModule,
+		DatabaseModule,
+		UserModule,
+		RoleModule,
+		ProjectModule,
+		TaskModule,
+		ConfigModule.forRoot({
+			isGlobal: true,
+			envFilePath: [
+				`.env.${process.env.NODE_ENV}.local`,
+				`.env.${process.env.NODE_ENV}`,
+				'.env.local',
+				'.env',
+			],
+			validationSchema: Joi.object({
+				NODE_ENV: Joi.string()
+					.valid('development', 'production', 'test')
+					.default('development'),
+				PORT: Joi.number().default(3000),
+
+				DB_HOST: Joi.string().required(),
+				DB_PORT: Joi.number().required(),
+				DB_USERNAME: Joi.string().required(),
+				DB_PASSWORD: Joi.string().required(),
+				DB_DATABASE: Joi.string().required(),
+
+				LOG_LEVEL: Joi.string()
+					.valid('error', 'warn', 'info', 'debug')
+					.default('info'),
+				LOG_DIR: Joi.string().required(),
+				LOG_MAX_FILES: Joi.string().required(),
+				LOG_MAX_SIZE: Joi.string().required(),
+				CONSOLE_LOG_ENABLED: Joi.boolean().default(true),
+			}),
+			validationOptions: {
+				allowUnknown: true,
+				abortEarly: true,
+			},
+			expandVariables: true,
+		}),
+	],
 	controllers: [AppController],
 	providers: [
 		{
