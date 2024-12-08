@@ -9,8 +9,8 @@ import { DeleteDateColumn, Column } from 'typeorm'
 
 export class DeletedColumns {
 	@DeleteDateColumn({ name: 'deleted_at', nullable: true })
-	deletedAt: Date
+	deletedAt?: Date
 
 	@Column({ name: 'deleted_by', nullable: true })
-	deletedBy: string
+	deletedBy?: string
 }

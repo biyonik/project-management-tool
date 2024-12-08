@@ -18,9 +18,12 @@ import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConne
 					username: configService.get('DB_USERNAME'),
 					password: configService.get('DB_PASSWORD'),
 					database: configService.get('DB_DATABASE'),
-					entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+					entities: [
+						__dirname +
+							'/../../modules/entities/domain/*.entity{.ts,.js}',
+					],
 					migrations: [__dirname + '/../migrations/*{.ts,.js}'],
-					synchronize: false,
+					synchronize: true,
 					logging: true,
 					migrationsRun: true,
 				}
@@ -30,4 +33,8 @@ import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConne
 	],
 	exports: [TypeOrmModule],
 })
-export class DatabaseModule {}
+export class DatabaseModule {
+	constructor() {
+		console.log(__dirname + '/../modules/entities/domain')
+	}
+}

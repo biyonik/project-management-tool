@@ -8,9 +8,9 @@
 import { UpdateDateColumn, Column } from 'typeorm'
 
 export class UpdatedColumns {
-	@UpdateDateColumn({ name: 'updated_at' })
-	updatedAt: Date
+	@UpdateDateColumn({ name: 'updated_at', nullable: true })
+	updatedAt?: Date
 
 	@Column({ name: 'updated_by', nullable: true })
-	updatedBy: string
+	updatedBy?: string
 }

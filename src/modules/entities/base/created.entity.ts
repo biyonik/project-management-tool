@@ -12,5 +12,5 @@ export class CreatedColumns {
 	createdAt: Date
 
 	@Column({ name: 'created_by', nullable: true })
-	createdBy: string
+	createdBy?: string
 }
