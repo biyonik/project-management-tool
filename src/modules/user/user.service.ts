@@ -19,6 +19,7 @@ import {
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { CachedList } from 'src/common/interfaces/cached-list.interface'
+import { MessageSourceService } from 'src/common/i18n/message-source.service'
 
 @Injectable()
 export class UserService extends BaseRepository<UserEntity, IApiResponse> {
@@ -26,11 +27,15 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		@InjectRepository(UserEntity)
 		protected readonly repository: Repository<UserEntity>,
 		protected readonly cacheService: CacheService,
+		protected readonly messageSource: MessageSourceService,
 	) {
-		super(repository, cacheService, 'user')
+		super(repository, cacheService, 'user', messageSource)
 	}
 
-	async findAll({ sort, page, limit }: FindAllParams): Promise<IApiResponse> {
+	async findAll(
+		{ sort, page, limit }: FindAllParams,
+		locale: string,
+	): Promise<IApiResponse> {
 		const cacheKey = `users:list:${page}:${limit}:${JSON.stringify(sort)}`
 
 		try {
@@ -62,7 +67,7 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 			if (total < 1) {
 				return ErrorResponse.of(
 					HttpStatus.NOT_FOUND.toString(),
-					'No users found',
+					this.messageSource.getMessage('user.not.found', locale),
 				)
 			}
 
@@ -80,20 +85,20 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
-				'Internal server error',
+				this.messageSource.getMessage('internal.server.error', locale),
 				error,
 			)
 		}
 	}
 
-	async findById(id: string): Promise<IApiResponse> {
+	async findById(id: string, locale: string): Promise<IApiResponse> {
 		try {
 			const user = await super.findById(id)
 			return SuccessDataResponse.of(user)
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.NOT_FOUND.toString(),
-				'User not found',
+				this.messageSource.getMessage('user.not.found', locale),
 				{ id },
 			)
 		}
@@ -111,11 +116,14 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 				const data = user as SuccessDataResponse<UserEntity>
 				await this.invalidateUserCache(data.data.id)
 			}
-			return SuccessDataResponse.of(user)
+			return SuccessDataResponse.of(
+				user,
+				this.messageSource.getMessage('user.create.succeed'),
+			)
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
-				'Failed to create user',
+				this.messageSource.getMessage('user.create.failed'),
 				error,
 			)
 		}
@@ -129,11 +137,14 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		try {
 			const user = await super.update(id, updateUserDto)
 			await this.invalidateUserCache(id)
-			return SuccessDataResponse.of(user)
+			return SuccessDataResponse.of(
+				user,
+				this.messageSource.getMessage('user.update.succedd'),
+			)
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.NOT_FOUND.toString(),
-				'User not found',
+				this.messageSource.getMessage('user.update.failed'),
 				{ id },
 			)
 		}
@@ -143,11 +154,13 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		try {
 			await super.delete(id)
 			await this.invalidateUserCache(id)
-			return SuccessResponse.of('User deleted successfully')
+			return SuccessResponse.of(
+				this.messageSource.getMessage('user.delete.succeed'),
+			)
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.NOT_FOUND.toString(),
-				'User not found',
+				this.messageSource.getMessage('user.not.found'),
 				{ id },
 			)
 		}
@@ -166,7 +179,7 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
-				'Error fetching active users',
+				this.messageSource.getMessage('active.user.fetch.error'),
 				error,
 			)
 		}
@@ -175,28 +188,37 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 	public async deactivateUser(id: string): Promise<IApiResponse> {
 		try {
 			await this.softDelete(id)
-			return SuccessResponse.of('User deactivated successfully')
+			return SuccessResponse.of(
+				this.messageSource.getMessage('user.deactivate.succeed'),
+			)
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
-				'Error deactivating user',
+				this.messageSource.getMessage('user.deactivate.error'),
 				error,
 			)
 		}
 	}
 
-	public async getUserWithProfile(id: string): Promise<IApiResponse> {
+	public async getUserWithProfile(
+		id: string,
+		locale: string,
+	): Promise<IApiResponse> {
 		try {
 			const userWithProfile = await this.loadRelations(
-				((await this.findById(id)) as SuccessDataResponse<UserEntity>)
-					.data,
+				(
+					(await this.findById(
+						id,
+						locale,
+					)) as SuccessDataResponse<UserEntity>
+				).data,
 				['profile', 'roles'],
 			)
 			return SuccessDataResponse.of(userWithProfile)
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.NOT_FOUND.toString(),
-				'User or profile not found',
+				this.messageSource.getMessage('user.profile.not.found'),
 				error,
 			)
 		}

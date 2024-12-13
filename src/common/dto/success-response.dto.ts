@@ -26,12 +26,12 @@ export class SuccessResponse implements IApiResponse {
 export class SuccessDataResponse<T> extends SuccessResponse {
 	data: T
 
-	constructor(data: T) {
-		super()
+	constructor(data: T, message?: string) {
+		super(message)
 		this.data = data
 	}
 
-	static of<T>(data: T): SuccessDataResponse<T> {
-		return new SuccessDataResponse(data)
+	static of<T>(data: T, message?: string): SuccessDataResponse<T> {
+		return new SuccessDataResponse(data, message)
 	}
 }

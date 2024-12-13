@@ -16,10 +16,12 @@ import { ModuleRef } from '@nestjs/core'
 import { Response } from 'express'
 import { ExceptionHandlerRegistry } from '../services/exception-handler.registry'
 import { ErrorResponse } from '../dto/error-response.dto'
+import { MessageSourceService } from '../i18n/message-source.service'
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
 	constructor(
+		private readonly messageSource: MessageSourceService,
 		private moduleRef: ModuleRef,
 		private exceptionHandlerRegistry: ExceptionHandlerRegistry,
 	) {}
@@ -27,6 +29,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 	catch(exception: Error, host: ArgumentsHost) {
 		const ctx = host.switchToHttp()
 		const response = ctx.getResponse<Response>()
+		const request = ctx.getRequest()
+		const locale = request.params.locale || 'en'
 
 		// Özel handler kontrolü
 		const handler = this.exceptionHandlerRegistry.getHandler(exception)
@@ -47,7 +51,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 			// Değilse, standart error response oluştur
 			return response
 				.status(status)
-				.json(ErrorResponse.of('HTTP_ERROR', exception.message, status))
+				.json(
+					ErrorResponse.of(
+						status.toString(),
+						this.messageSource.getMessage(
+							exception.message,
+							locale,
+						),
+						status,
+					),
+				)
 		}
 
 		// Beklenmeyen hatalar için
@@ -56,7 +69,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 			.json(
 				ErrorResponse.of(
 					'INTERNAL_SERVER_ERROR',
-					'An unexpected error occurred',
+					this.messageSource.getMessage('server.error', locale),
 					process.env.NODE_ENV === 'development'
 						? exception.stack
 						: undefined,

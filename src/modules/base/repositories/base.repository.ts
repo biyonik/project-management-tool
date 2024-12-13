@@ -13,15 +13,17 @@ import { SuccessResponse } from 'src/common/dto/success-response.dto'
 import { SuccessPaginatedDataResponse } from 'src/common/dto/success-paginated-response.dto'
 import { CachedList } from 'src/common/interfaces/cached-list.interface'
 import FindAllParams from 'src/common/params/find-all.params'
+import { MessageSourceService } from 'src/common/i18n/message-source.service'
 
 export abstract class BaseRepository<T extends BaseEntity, R = T> {
 	protected constructor(
 		protected readonly repository: Repository<T>,
 		protected readonly cacheService: CacheService,
 		protected readonly entityName: string,
+		protected readonly messageSource: MessageSourceService,
 	) {}
 
-	protected async findById(id: string): Promise<R> {
+	protected async findById(id: string, locale?: string): Promise<R> {
 		const cacheKey = this.getCacheKey(id)
 		const cachedData = await this.cacheService.get<T>(cacheKey)
 
