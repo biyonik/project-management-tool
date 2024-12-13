@@ -17,7 +17,11 @@ export class SuccessPaginatedDataResponse<T> extends SuccessResponse {
 		this.meta = meta
 	}
 
-	static of<T>(
+	static of(message: string): SuccessResponse {
+		return new SuccessResponse(message)
+	}
+
+	static createPaginated<T>(
 		data: T[],
 		page: number,
 		limit: number,

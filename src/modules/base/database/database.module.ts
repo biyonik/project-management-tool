@@ -20,7 +20,7 @@ import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConne
 					database: configService.get('DB_DATABASE'),
 					entities: [
 						__dirname +
-							'/../../modules/entities/domain/*.entity{.ts,.js}',
+							'/../../../modules/entities/domain/*.entity{.ts,.js}',
 					],
 					migrations: [__dirname + '/../migrations/*{.ts,.js}'],
 					synchronize: true,

@@ -3,18 +3,20 @@ import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { ExceptionHandlerRegistry } from 'src/common/services/exception-handler.registry'
 import { GlobalExceptionFilter } from 'src/common/filters/global-exception.filter'
-import { APP_FILTER, ModuleRef } from '@nestjs/core'
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE, ModuleRef } from '@nestjs/core'
 import { EXCEPTION_HANDLER_METADATA } from 'src/common/decorators/exception-handlers'
 import { GlobalExceptionHandlers } from 'src/common/handlers/global-exception.handler'
 import { LoggerService } from 'src/common/services/logger.service'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { AuthModule } from '../auth/auth.module'
-import { DatabaseModule } from '../database/database.module'
+import { DatabaseModule } from '../base/database/database.module'
 import { UserModule } from '../user/user.module'
 import { RoleModule } from '../role/role.module'
 import { ProjectModule } from '../project/project.module'
 import { TaskModule } from '../task/task.module'
 import * as Joi from 'joi'
+import { CustomValidationPipe } from 'src/common/pipes/validation.pipe'
+import { ResponseInterceptor } from 'src/common/interceptors/response.interceptor'
 
 @Module({
 	imports: [
@@ -64,6 +66,14 @@ import * as Joi from 'joi'
 		{
 			provide: APP_FILTER,
 			useClass: GlobalExceptionFilter,
+		},
+		{
+			provide: APP_PIPE,
+			useClass: CustomValidationPipe,
+		},
+		{
+			provide: APP_INTERCEPTOR,
+			useClass: ResponseInterceptor,
 		},
 		ExceptionHandlerRegistry,
 		GlobalExceptionHandlers,

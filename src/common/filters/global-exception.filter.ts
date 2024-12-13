@@ -28,21 +28,29 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 		const ctx = host.switchToHttp()
 		const response = ctx.getResponse<Response>()
 
-		// Önce özel handler'ı kontrol et
+		// Özel handler kontrolü
 		const handler = this.exceptionHandlerRegistry.getHandler(exception)
 		if (handler) {
 			const errorResponse = handler(exception)
 			return response.status(HttpStatus.BAD_REQUEST).json(errorResponse)
 		}
 
-		// Varsayılan error handling mantığı
 		if (exception instanceof HttpException) {
 			const status = exception.getStatus()
+			const responseBody = exception.getResponse()
+
+			// Eğer zaten bir ErrorResponse ise, direkt kullan
+			if (responseBody instanceof ErrorResponse) {
+				return response.status(status).json(responseBody)
+			}
+
+			// Değilse, standart error response oluştur
 			return response
 				.status(status)
 				.json(ErrorResponse.of('HTTP_ERROR', exception.message, status))
 		}
 
+		// Beklenmeyen hatalar için
 		return response
 			.status(HttpStatus.INTERNAL_SERVER_ERROR)
 			.json(

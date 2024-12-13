@@ -24,12 +24,18 @@ export class ResponseInterceptor implements NestInterceptor {
 	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
 		return next.handle().pipe(
 			map((response) => {
-				// Zaten bir Response tipinde ise direkt dön
+				const httpResponse = context.switchToHttp().getResponse()
+
+				// Zaten bir Response tipinde ise
 				if (
 					response instanceof SuccessResponse ||
 					response instanceof SuccessPaginatedDataResponse ||
 					response instanceof ErrorResponse
 				) {
+					// Error Response ise status code'u ayarla
+					if (response instanceof ErrorResponse) {
+						httpResponse.status(parseInt(response.error.code))
+					}
 					return response
 				}
 

@@ -10,10 +10,16 @@ import { IApiResponse } from '../interfaces/apiresponse.interface'
 export class SuccessResponse implements IApiResponse {
 	success: boolean
 	timestamp: string
+	message: string
 
-	constructor() {
+	constructor(message?: string) {
 		this.success = true
 		this.timestamp = new Date().toISOString()
+		this.message = message
+	}
+
+	static of(message: string): SuccessResponse {
+		return new SuccessResponse(message)
 	}
 }
 
