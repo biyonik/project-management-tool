@@ -14,6 +14,7 @@ import { SuccessPaginatedDataResponse } from 'src/common/dto/success-paginated-r
 import { CachedList } from 'src/common/interfaces/cached-list.interface'
 import FindAllParams from 'src/common/params/find-all.params'
 import { MessageSourceService } from 'src/common/i18n/message-source.service'
+import { AuditLogService } from '../audit-log/audit-log.service'
 
 export abstract class BaseRepository<T extends BaseEntity, R = T> {
 	protected constructor(
@@ -21,6 +22,7 @@ export abstract class BaseRepository<T extends BaseEntity, R = T> {
 		protected readonly cacheService: CacheService,
 		protected readonly entityName: string,
 		protected readonly messageSource: MessageSourceService,
+		protected readonly auditLogService: AuditLogService,
 	) {}
 
 	protected async findById(id: string, locale?: string): Promise<R> {
@@ -45,26 +47,51 @@ export abstract class BaseRepository<T extends BaseEntity, R = T> {
 		return entity as unknown as R
 	}
 
-	protected async create(data: DeepPartial<T>): Promise<R> {
+	protected async create(data: DeepPartial<T>, userId: string): Promise<R> {
 		const savedEntity = await this.repository.save(data as DeepPartial<T>)
 		const typedEntity = savedEntity as T
+
+		await this.auditLogService.logChange({
+			entityType: this.entityName,
+			entityId: savedEntity.id,
+			action: 'CREATE',
+			newValues: this.getEntityValues(savedEntity),
+			userId,
+		})
+
 		const cacheKey = this.getCacheKey(typedEntity.id)
 		await this.cacheService.set(cacheKey, typedEntity)
 		return typedEntity as unknown as R
 	}
 
-	protected async update(id: string, data: DeepPartial<T>): Promise<R> {
-		await this.repository.update(id, data as QueryDeepPartialEntity<T>)
-
-		const updated = await this.repository.findOne({
-			where: { id } as FindOptionsWhere<T>,
+	protected async update(
+		id: string,
+		data: DeepPartial<T>,
+		userId: string,
+	): Promise<R> {
+		const oldEntity = await this.repository.findOne({
+			where: { id: id } as FindOptionsWhere<T>,
 		})
 
-		if (!updated) {
+		if (!oldEntity) {
 			throw new NotFoundException(
 				`${this.entityName} with id ${id} not found`,
 			)
 		}
+
+		const updated = await this.repository.update(
+			id,
+			data as QueryDeepPartialEntity<T>,
+		)
+
+		await this.auditLogService.logChange({
+			entityType: this.entityName,
+			entityId: id,
+			action: 'UPDATE',
+			oldValues: this.getEntityValues(oldEntity),
+			newValues: this.getEntityValues(updated.raw),
+			userId,
+		})
 
 		const cacheKey = this.getCacheKey(id)
 		await this.cacheService.set(cacheKey, updated)
@@ -239,5 +266,18 @@ export abstract class BaseRepository<T extends BaseEntity, R = T> {
 
 	protected getCacheKey(id: string): string {
 		return `${this.entityName}:${id}`
+	}
+
+	private getEntityValues(entity: T): Record<string, any> {
+		const metadata = this.repository.metadata
+		const values: Record<string, any> = {}
+
+		metadata.columns.forEach((column) => {
+			if (!column.isVirtual) {
+				values[column.propertyName] = entity[column.propertyName]
+			}
+		})
+
+		return values
 	}
 }
