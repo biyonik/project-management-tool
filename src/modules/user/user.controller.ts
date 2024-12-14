@@ -17,7 +17,6 @@ import { IApiResponse } from 'src/common/interfaces/apiresponse.interface'
 import { ValidIdPipe } from 'src/common/pipes/valid-id.pipe'
 import { SortValidationPipe } from 'src/common/pipes/sort-validation.pipe'
 import FindAllParams from 'src/common/params/find-all.params'
-import { Locale } from 'src/common/decorators/locale.decorator'
 
 @Controller(':locale/users')
 export class UserController {
@@ -32,25 +31,18 @@ export class UserController {
 		sort: Array<{ field: string; order: 'ASC' | 'DESC' }>,
 		@Query('page') page: number = 1,
 		@Query('limit') limit: number = 10,
-		@Locale() locale: string,
 	): Promise<IApiResponse> {
-		const result = await this.userService.findAll(
-			{
-				sort,
-				page,
-				limit,
-			} as FindAllParams,
-			locale,
-		)
+		const result = await this.userService.findAll({
+			sort,
+			page,
+			limit,
+		} as FindAllParams)
 		return result
 	}
 
 	@Get('id/:id')
-	async getById(
-		@Param('id', ValidIdPipe) id: string,
-		@Locale() locale: string,
-	): Promise<IApiResponse> {
-		const result = await this.userService.findById(id, locale)
+	async getById(@Param('id', ValidIdPipe) id: string): Promise<IApiResponse> {
+		const result = await this.userService.findById(id)
 		return result
 	}
 
@@ -85,10 +77,7 @@ export class UserController {
 	}
 
 	@Get(':id/profile')
-	async getUserWithProfile(
-		@Param('id', ValidIdPipe) id: string,
-		@Locale() locale: string,
-	) {
-		return this.userService.getUserWithProfile(id, locale)
+	async getUserWithProfile(@Param('id', ValidIdPipe) id: string) {
+		return this.userService.getUserWithProfile(id)
 	}
 }

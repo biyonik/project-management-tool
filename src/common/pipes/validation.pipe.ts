@@ -23,6 +23,8 @@ export class CustomValidationPipe implements PipeTransform<any> {
 		const object = plainToClass(metatype, value)
 		const errors = await validate(object)
 
+		console.log('err: ', errors)
+
 		if (errors.length > 0) {
 			throw new ValidationException(errors)
 		}

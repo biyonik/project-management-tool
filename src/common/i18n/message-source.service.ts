@@ -21,7 +21,7 @@ export class MessageSourceService implements OnModuleInit {
 		await this.loadAllMessages()
 
 		// Dosya değişikliklerini izle
-		this.watchFiles()
+		// this.watchFiles()
 	}
 
 	private async loadAllMessages() {
@@ -46,7 +46,6 @@ export class MessageSourceService implements OnModuleInit {
 		})
 
 		this.messages.set(locale, messageMap)
-		console.log(`Loaded messages for locale: ${locale}`)
 	}
 
 	private watchFiles() {

@@ -1,47 +1,50 @@
 import { HttpStatus, Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
-import { UserEntity } from '../entities/domain/user.entity'
-import { IApiResponse } from '../../common/interfaces/apiresponse.interface'
-import { ErrorResponse } from '../../common/dto/error-response.dto'
-import { SuccessPaginatedDataResponse } from '../../common/dto/success-paginated-response.dto'
-import { CacheService } from '../base/cache/cache.service'
-import FindAllParams from 'src/common/params/find-all.params'
-import { BaseRepository } from '../base/repositories/base.repository'
+import { ErrorResponse } from 'src/common/dto/error-response.dto'
 import {
 	SuccessDataResponse,
 	SuccessResponse,
 } from 'src/common/dto/success-response.dto'
+import { IApiResponse } from 'src/common/interfaces/apiresponse.interface'
+import { CacheService } from '../base/cache/cache.service'
+import { MessageSourceService } from 'src/common/i18n/message-source.service'
+import { AuditLogService } from '../base/audit-log/audit-log.service'
+import { BaseService } from '../base/services/base.service'
+import { UserEntity } from '../entities/domain/user.entity'
+import { UserRepository } from './user.repository'
+import FindAllParams from 'src/common/params/find-all.params'
+import { CachedList } from 'src/common/interfaces/cached-list.interface'
+import { SuccessPaginatedDataResponse } from 'src/common/dto/success-paginated-response.dto'
 import {
 	ValidateUniqueEmailForCreate,
 	ValidateUniqueEmailForUpdate,
 } from 'src/common/decorators/validation/unique-email.decorator'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
-import { CachedList } from 'src/common/interfaces/cached-list.interface'
-import { MessageSourceService } from 'src/common/i18n/message-source.service'
-import { AuditLogService } from '../base/audit-log/audit-log.service'
+import { LocaleProvider } from '../../common/i18n/locale.provider'
 
 @Injectable()
-export class UserService extends BaseRepository<UserEntity, IApiResponse> {
+export class UserService extends BaseService<UserEntity> {
+	locale: string
 	constructor(
-		@InjectRepository(UserEntity)
-		protected readonly repository: Repository<UserEntity>,
-		protected readonly cacheService: CacheService,
-		protected readonly messageSource: MessageSourceService,
-		protected readonly auditLogService: AuditLogService,
+		private readonly userRepository: UserRepository,
+		cacheService: CacheService,
+		messageSource: MessageSourceService,
+		auditLogService: AuditLogService,
 	) {
-		super(repository, cacheService, 'user', messageSource, auditLogService)
+		super(
+			userRepository,
+			cacheService,
+			messageSource,
+			auditLogService,
+			'user',
+		)
+		this.locale = LocaleProvider.getLocale()
 	}
 
-	async findAll(
-		{ sort, page, limit }: FindAllParams,
-		locale: string,
-	): Promise<IApiResponse> {
+	async findAll({ sort, page, limit }: FindAllParams): Promise<IApiResponse> {
 		const cacheKey = `users:list:${page}:${limit}:${JSON.stringify(sort)}`
 
 		try {
-			// Cache'den veriyi tipli olarak al
 			const cachedData =
 				await this.cacheService.get<CachedList<UserEntity>>(cacheKey)
 			if (cachedData) {
@@ -54,26 +57,24 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 				)
 			}
 
-			// Database sorgusu ve diğer işlemler...
-			const queryBuilder = this.repository.createQueryBuilder('user')
-
-			sort.forEach(({ field, order }) => {
-				queryBuilder.addOrderBy(`user.${field}`, order)
-			})
-
-			const [data, total] = await queryBuilder
-				.skip((page - 1) * limit)
-				.take(limit)
-				.getManyAndCount()
+			const [data, total] =
+				await this.userRepository.findByWithPagination(
+					{},
+					page,
+					limit,
+					sort,
+				)
 
 			if (total < 1) {
 				return ErrorResponse.of(
 					HttpStatus.NOT_FOUND.toString(),
-					this.messageSource.getMessage('user.not.found', locale),
+					this.messageSource.getMessage(
+						'user.not.found.all',
+						this.getLocale(),
+					),
 				)
 			}
 
-			// Cache'e kaydet
 			const cacheData: CachedList<UserEntity> = { data, total }
 			await this.cacheService.set(cacheKey, cacheData, 300)
 
@@ -87,157 +88,135 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
-				this.messageSource.getMessage('internal.server.error', locale),
+				this.messageSource.getMessage(
+					'internal.server.error',
+					this.getLocale(),
+				),
 				error,
-			)
-		}
-	}
-
-	async findById(id: string, locale: string): Promise<IApiResponse> {
-		try {
-			const user = await super.findById(id)
-			return SuccessDataResponse.of(user)
-		} catch (error) {
-			return ErrorResponse.of(
-				HttpStatus.NOT_FOUND.toString(),
-				this.messageSource.getMessage('user.not.found', locale, { id }),
-				{ id },
 			)
 		}
 	}
 
 	@ValidateUniqueEmailForCreate()
-	public async create(
+	async create(
 		createUserDto: CreateUserDto,
-		userId,
+		userId: string,
 	): Promise<IApiResponse> {
-		try {
-			const user = await super.create(createUserDto, userId)
-			if (user.success === true) {
-				// Invalidate list cache
-				await this.cacheService.clear('users:list:*' as string)
+		const result = await super.create(createUserDto, userId)
 
-				// Invalidate user cache
-				const data = user as SuccessDataResponse<UserEntity>
-				await this.invalidateUserCache(data.data.id)
-			}
+		if (result instanceof SuccessDataResponse) {
+			await this.invalidateCache()
 			return SuccessDataResponse.of(
-				user,
+				result.data,
 				this.messageSource.getMessage('user.create.succeed'),
 			)
-		} catch (error) {
-			return ErrorResponse.of(
-				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
-				this.messageSource.getMessage('user.create.failed'),
-				error,
-			)
 		}
+
+		return ErrorResponse.of(
+			HttpStatus.INTERNAL_SERVER_ERROR.toString(),
+			this.messageSource.getMessage('user.create.failed'),
+		)
 	}
 
 	@ValidateUniqueEmailForUpdate()
-	public async update(
+	async update(
 		id: string,
 		updateUserDto: UpdateUserDto,
 		userId: string,
 	): Promise<IApiResponse> {
-		try {
-			const user = await super.update(id, updateUserDto, userId)
-			await this.invalidateUserCache(id)
+		const result = await super.update(id, updateUserDto, userId)
+
+		if (result instanceof SuccessDataResponse) {
+			await this.invalidateCache(id)
 			return SuccessDataResponse.of(
-				user,
-				this.messageSource.getMessage('user.update.succedd'),
-			)
-		} catch (error) {
-			return ErrorResponse.of(
-				HttpStatus.NOT_FOUND.toString(),
-				this.messageSource.getMessage('user.update.failed'),
-				{ id },
+				result.data,
+				this.messageSource.getMessage('user.update.succeed'),
 			)
 		}
+
+		return ErrorResponse.of(
+			HttpStatus.NOT_FOUND.toString(),
+			this.messageSource.getMessage('user.update.failed'),
+		)
 	}
 
-	public async delete(id: string): Promise<IApiResponse> {
-		try {
-			await super.delete(id)
-			await this.invalidateUserCache(id)
-			return SuccessResponse.of(
-				this.messageSource.getMessage('user.delete.succeed'),
-			)
-		} catch (error) {
-			return ErrorResponse.of(
-				HttpStatus.NOT_FOUND.toString(),
-				this.messageSource.getMessage('user.not.found'),
-				{ id },
-			)
-		}
-	}
-
-	public async findActiveUsers({
+	async findActiveUsers({
 		page,
 		limit,
 		sort,
 	}: FindAllParams): Promise<IApiResponse> {
 		try {
-			return await this.findByWithPagination(
-				{ isActive: true },
-				{ page, limit, sort },
+			const [data, total] =
+				await this.userRepository.findByWithPagination(
+					{ isActive: true },
+					page,
+					limit,
+					sort,
+				)
+
+			return SuccessPaginatedDataResponse.createPaginated(
+				data,
+				total,
+				page,
+				limit,
+				sort,
 			)
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
 				this.messageSource.getMessage('active.user.fetch.error'),
-				error,
 			)
 		}
 	}
 
-	public async deactivateUser(
+	async deactivateUser(
 		id: string,
 		userId: string,
 		reason?: string,
 	): Promise<IApiResponse> {
-		try {
-			await this.softDelete(id, userId, reason)
+		const result = await super.softDelete(id, userId, reason)
+
+		if (result instanceof SuccessResponse) {
 			return SuccessResponse.of(
 				this.messageSource.getMessage('user.deactivate.succeed'),
 			)
-		} catch (error) {
-			return ErrorResponse.of(
-				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
-				this.messageSource.getMessage('user.deactivate.error'),
-				error,
-			)
 		}
+
+		return ErrorResponse.of(
+			HttpStatus.INTERNAL_SERVER_ERROR.toString(),
+			this.messageSource.getMessage('user.deactivate.error'),
+		)
 	}
 
-	public async getUserWithProfile(
-		id: string,
-		locale: string,
-	): Promise<IApiResponse> {
+	async getUserWithProfile(id: string): Promise<IApiResponse> {
 		try {
-			const userWithProfile = await this.loadRelations(
-				(
-					(await this.findById(
-						id,
-						locale,
-					)) as SuccessDataResponse<UserEntity>
-				).data,
+			const userResult = await this.findById(id)
+
+			if (!(userResult instanceof SuccessDataResponse)) {
+				return userResult
+			}
+
+			const userWithProfile = await this.userRepository.loadRelations(
+				userResult.data.id,
 				['profile', 'roles'],
 			)
+
 			return SuccessDataResponse.of(userWithProfile)
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.NOT_FOUND.toString(),
 				this.messageSource.getMessage('user.profile.not.found'),
-				error,
 			)
 		}
 	}
 
-	private async invalidateUserCache(id: string): Promise<void> {
-		await Promise.all([
-			this.cacheService.delete(`user:${id}`),
-			this.cacheService.clear('users:list:*'),
-		])
+	private async invalidateCache(id?: string): Promise<void> {
+		const promises = [this.cacheService.clear('users:list:*')]
+
+		if (id) {
+			promises.push(this.cacheService.delete(`user:${id}`))
+		}
+
+		await Promise.all(promises)
 	}
 }
