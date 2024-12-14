@@ -56,7 +56,7 @@ export class UserController {
 
 	@Post()
 	async create(@Body() data: CreateUserDto): Promise<IApiResponse> {
-		const result = await this.userService.create(data)
+		const result = await this.userService.create(data, '')
 		return result
 	}
 
@@ -65,7 +65,7 @@ export class UserController {
 		@Param('id', ValidIdPipe) id: string,
 		@Body() data: UpdateUserDto,
 	): Promise<IApiResponse> {
-		const result = await this.userService.update(id, data)
+		const result = await this.userService.update(id, data, '')
 		return result
 	}
 
@@ -80,8 +80,8 @@ export class UserController {
 	}
 
 	@Delete(':id')
-	async deactivateUser(@Param('id', ValidIdPipe) id: string) {
-		return this.userService.deactivateUser(id)
+	async deactivateUser(@Param('id', ValidIdPipe) id: string, userId: string) {
+		return this.userService.deactivateUser(id, userId)
 	}
 
 	@Get(':id/profile')

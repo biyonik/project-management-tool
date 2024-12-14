@@ -18,10 +18,12 @@ import * as Joi from 'joi'
 import { CustomValidationPipe } from 'src/common/pipes/validation.pipe'
 import { ResponseInterceptor } from 'src/common/interceptors/response.interceptor'
 import { I18nModule } from 'src/common/i18n/i18n.module'
+import { AuditLogModule } from '../base/audit-log/audit-log.module'
 
 @Module({
 	imports: [
 		I18nModule,
+		AuditLogModule,
 		AuthModule,
 		DatabaseModule,
 		UserModule,

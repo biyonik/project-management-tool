@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn } from 'typeorm'
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
 
 @Entity('audit_logs')
 export class AuditLogEntity {

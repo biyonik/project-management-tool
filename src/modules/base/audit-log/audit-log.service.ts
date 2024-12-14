@@ -22,6 +22,7 @@ export class AuditLogService {
 		oldValues?: Record<string, any>
 		newValues?: Record<string, any>
 		userId: string
+		additionalInfo?: Record<string, any>
 	}): Promise<void> {
 		const auditLog = this.auditLogRepository.create({
 			...params,

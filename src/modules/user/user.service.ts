@@ -1,4 +1,4 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { UserEntity } from '../entities/domain/user.entity'
@@ -20,6 +20,7 @@ import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { CachedList } from 'src/common/interfaces/cached-list.interface'
 import { MessageSourceService } from 'src/common/i18n/message-source.service'
+import { AuditLogService } from '../base/audit-log/audit-log.service'
 
 @Injectable()
 export class UserService extends BaseRepository<UserEntity, IApiResponse> {
@@ -27,9 +28,10 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		@InjectRepository(UserEntity)
 		protected readonly repository: Repository<UserEntity>,
 		protected readonly cacheService: CacheService,
-		@Inject() protected readonly messageSource: MessageSourceService,
+		protected readonly messageSource: MessageSourceService,
+		protected readonly auditLogService: AuditLogService,
 	) {
-		super(repository, cacheService, 'user', messageSource)
+		super(repository, cacheService, 'user', messageSource, auditLogService)
 	}
 
 	async findAll(
@@ -105,9 +107,12 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 	}
 
 	@ValidateUniqueEmailForCreate()
-	public async create(createUserDto: CreateUserDto): Promise<IApiResponse> {
+	public async create(
+		createUserDto: CreateUserDto,
+		userId,
+	): Promise<IApiResponse> {
 		try {
-			const user = await super.create(createUserDto)
+			const user = await super.create(createUserDto, userId)
 			if (user.success === true) {
 				// Invalidate list cache
 				await this.cacheService.clear('users:list:*' as string)
@@ -133,9 +138,10 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 	public async update(
 		id: string,
 		updateUserDto: UpdateUserDto,
+		userId: string,
 	): Promise<IApiResponse> {
 		try {
-			const user = await super.update(id, updateUserDto)
+			const user = await super.update(id, updateUserDto, userId)
 			await this.invalidateUserCache(id)
 			return SuccessDataResponse.of(
 				user,
@@ -185,9 +191,13 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		}
 	}
 
-	public async deactivateUser(id: string): Promise<IApiResponse> {
+	public async deactivateUser(
+		id: string,
+		userId: string,
+		reason?: string,
+	): Promise<IApiResponse> {
 		try {
-			await this.softDelete(id)
+			await this.softDelete(id, userId, reason)
 			return SuccessResponse.of(
 				this.messageSource.getMessage('user.deactivate.succeed'),
 			)

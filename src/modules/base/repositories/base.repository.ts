@@ -1,22 +1,21 @@
 import { Repository, FindOptionsWhere, DeepPartial } from 'typeorm'
 import { CacheService } from '../cache/cache.service'
 import {
-	BadRequestException,
 	HttpException,
 	InternalServerErrorException,
 	NotFoundException,
 } from '@nestjs/common'
-import { BaseEntity } from 'src/modules/entities/base/base.entity'
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity'
 import { IApiResponse } from 'src/common/interfaces/apiresponse.interface'
-import { SuccessResponse } from 'src/common/dto/success-response.dto'
 import { SuccessPaginatedDataResponse } from 'src/common/dto/success-paginated-response.dto'
 import { CachedList } from 'src/common/interfaces/cached-list.interface'
 import FindAllParams from 'src/common/params/find-all.params'
 import { MessageSourceService } from 'src/common/i18n/message-source.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
+import { ArchivableEntity } from 'src/modules/entities/base/archivable.entity'
+import { ArchiveStatus } from 'src/common/enums/archive-status.enum'
 
-export abstract class BaseRepository<T extends BaseEntity, R = T> {
+export abstract class BaseRepository<T extends ArchivableEntity, R = T> {
 	protected constructor(
 		protected readonly repository: Repository<T>,
 		protected readonly cacheService: CacheService,
@@ -171,50 +170,119 @@ export abstract class BaseRepository<T extends BaseEntity, R = T> {
 		}
 	}
 
-	protected async softDelete(id: string): Promise<R> {
-		try {
-			// Önce entity'nin var olduğundan emin ol
-			const entityToDelete = (await this.findById(id)) as BaseEntity
+	protected async softDelete(
+		id: string,
+		userId: string,
+		reason?: string,
+	): Promise<void> {
+		const entityToDelete = await this.findById(id)
 
-			// İlişkili verileri kontrol et
-			const metadata = this.repository.metadata
-			const relations = metadata.relations
+		const updateQuery = this.repository
+			.createQueryBuilder()
+			.update(this.repository.target)
+			.set({
+				deletedBy: userId,
+				deletionReason: reason,
+				archiveStatus: ArchiveStatus.DELETED,
+				deletedAt: new Date(),
+			} as unknown as QueryDeepPartialEntity<T>)
+			.where('id = :id', { id })
 
-			// Her ilişki için kontrol
-			for (const relation of relations) {
-				if (relation.onDelete === 'RESTRICT') {
-					const count = await this.repository
-						.createQueryBuilder()
-						.relation(metadata.name, relation.propertyName)
-						.of(entityToDelete.id) // entityToDelete'i kullan
-						.loadMany()
+		await updateQuery.execute()
 
-					if (count && count.length > 0) {
-						throw new BadRequestException(
-							`Cannot delete ${this.entityName} due to existing ${relation.propertyName}`,
-						)
-					}
-				}
-			}
+		await this.auditLogService.logChange({
+			entityType: this.entityName,
+			entityId: id,
+			action: 'SOFT_DELETE',
+			oldValues: this.getEntityValues(entityToDelete),
+			userId,
+			additionalInfo: { reason },
+		})
 
-			// Soft delete işlemi
-			await this.repository.softDelete(entityToDelete.id) // entityToDelete'i kullan
+		await this.invalidateEntityCache(id)
+	}
 
-			// Cache temizleme
-			await this.invalidateEntityCache(entityToDelete.id)
+	protected async archive(id: string, userId: string): Promise<void> {
+		const entity = await this.findById(id)
 
-			return SuccessResponse.of(
-				`${this.entityName} soft deleted successfully`,
-			) as R
-		} catch (error) {
-			if (error instanceof HttpException) {
-				throw error
-			}
-			throw new InternalServerErrorException(
-				`Error soft deleting ${this.entityName}`,
-				error,
+		const updateQuery = this.repository
+			.createQueryBuilder()
+			.update(this.repository.target)
+			.set({
+				archiveStatus: ArchiveStatus.ARCHIVED,
+				archiveDate: new Date(),
+				archivedBy: userId,
+			} as unknown as QueryDeepPartialEntity<T>)
+			.where('id = :id', { id })
+
+		await updateQuery.execute()
+
+		await this.auditLogService.logChange({
+			entityType: this.entityName,
+			entityId: id,
+			action: 'ARCHIVE',
+			oldValues: this.getEntityValues(entity),
+			userId,
+		})
+
+		await this.invalidateEntityCache(id)
+	}
+
+	protected async restore(id: string, userId: string): Promise<R> {
+		const entity = await this.repository.findOne({
+			where: { id } as FindOptionsWhere<T>,
+			withDeleted: true,
+		})
+
+		if (!entity) {
+			throw new NotFoundException(
+				this.messageSource.getMessage(
+					`${this.entityName}.not.found`,
+					'en',
+					{ id },
+				),
 			)
 		}
+
+		entity.deletedAt = null
+		entity.deletedBy = null
+		entity.deletionReason = null
+		entity.archiveStatus = ArchiveStatus.ACTIVE
+
+		const restoredEntity = await this.repository.save(entity)
+
+		await this.auditLogService.logChange({
+			entityType: this.entityName,
+			entityId: id,
+			action: 'RESTORE',
+			newValues: this.getEntityValues(restoredEntity),
+			userId,
+		})
+
+		return restoredEntity as unknown as R
+	}
+
+	protected async findDeleted(options: {
+		page: number
+		limit: number
+	}): Promise<[T[], number]> {
+		return await this.repository.findAndCount({
+			where: { archiveStatus: 'DELETED' } as FindOptionsWhere<T>,
+			withDeleted: true,
+			skip: (options.page - 1) * options.limit,
+			take: options.limit,
+		})
+	}
+
+	protected async findArchived(options: {
+		page: number
+		limit: number
+	}): Promise<[T[], number]> {
+		return await this.repository.findAndCount({
+			where: { archiveStatus: 'ARCHIVED' } as FindOptionsWhere<T>,
+			skip: (options.page - 1) * options.limit,
+			take: options.limit,
+		})
 	}
 
 	protected async loadRelations(entity: T, relations: string[]): Promise<T> {
@@ -268,7 +336,7 @@ export abstract class BaseRepository<T extends BaseEntity, R = T> {
 		return `${this.entityName}:${id}`
 	}
 
-	private getEntityValues(entity: T): Record<string, any> {
+	private getEntityValues(entity: R | T): Record<string, any> {
 		const metadata = this.repository.metadata
 		const values: Record<string, any> = {}
 

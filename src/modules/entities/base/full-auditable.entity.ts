@@ -9,9 +9,9 @@ import { Column } from 'typeorm'
 import { CreatedColumns } from './created.entity'
 import { DeletedColumns } from './deleted.entity'
 import { UpdatedColumns } from './updated.entity'
-import { BaseEntity } from './base.entity'
+import { ArchivableEntity } from './archivable.entity'
 
-export abstract class FullAuditableEntity extends BaseEntity {
+export abstract class FullAuditableEntity extends ArchivableEntity {
 	@Column(() => CreatedColumns, { prefix: false })
 	created: CreatedColumns
 
