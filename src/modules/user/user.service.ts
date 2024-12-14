@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from '@nestjs/common'
+import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { UserEntity } from '../entities/domain/user.entity'
@@ -27,7 +27,7 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		@InjectRepository(UserEntity)
 		protected readonly repository: Repository<UserEntity>,
 		protected readonly cacheService: CacheService,
-		protected readonly messageSource: MessageSourceService,
+		@Inject() protected readonly messageSource: MessageSourceService,
 	) {
 		super(repository, cacheService, 'user', messageSource)
 	}
@@ -98,7 +98,7 @@ export class UserService extends BaseRepository<UserEntity, IApiResponse> {
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.NOT_FOUND.toString(),
-				this.messageSource.getMessage('user.not.found', locale),
+				this.messageSource.getMessage('user.not.found', locale, { id }),
 				{ id },
 			)
 		}
