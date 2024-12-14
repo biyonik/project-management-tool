@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer'
 import {
 	IsBoolean,
 	IsDate,
@@ -62,8 +63,10 @@ export class CreateUserDto {
 	dateOfBirth?: Date
 
 	@IsBoolean()
+	@Transform(({ value }) => value ?? false)
 	isActive: boolean
 
 	@IsBoolean()
+	@Transform(({ value }) => value ?? false)
 	isVerified: boolean
 }
