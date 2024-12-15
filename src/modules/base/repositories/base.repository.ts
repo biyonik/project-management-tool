@@ -85,8 +85,8 @@ export abstract class BaseRepository<T extends ArchivableEntity> {
 			throw new NotFoundException()
 		}
 
-		entity.deletedAt = null
-		entity.deletedBy = null
+		entity.deleted.deletedAt = null
+		entity.deleted.deletedBy = null
 		entity.deletionReason = null
 		entity.archiveStatus = ArchiveStatus.ACTIVE
 

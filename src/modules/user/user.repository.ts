@@ -12,4 +12,8 @@ export class UserRepository extends BaseRepository<UserEntity> {
 	) {
 		super(repository)
 	}
+
+	async findByEmail(email: string): Promise<UserEntity | null> {
+		return this.repository.findOneBy({ email })
+	}
 }

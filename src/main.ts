@@ -6,6 +6,7 @@ import { MessageSourceService } from './common/i18n/message-source.service'
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule)
+
 	app.setGlobalPrefix('api/v1/')
 
 	app.useGlobalInterceptors(new LocaleInterceptor())

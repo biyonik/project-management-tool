@@ -20,10 +20,12 @@ import { I18nModule } from 'src/common/i18n/i18n.module'
 import { AuditLogModule } from '../base/audit-log/audit-log.module'
 import { EventDispatcherInterceptor } from 'src/common/interceptors/event-dispatch.interceptor'
 import { EventDispatcher } from 'src/common/events/event-dispatcher.service'
+import { EmailModule } from '../base/email/email.module'
 
 @Module({
 	imports: [
 		I18nModule,
+		EmailModule,
 		AuditLogModule,
 		AuthModule,
 		DatabaseModule,

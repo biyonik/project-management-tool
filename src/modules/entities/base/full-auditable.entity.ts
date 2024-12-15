@@ -7,7 +7,6 @@
 
 import { Column } from 'typeorm'
 import { CreatedColumns } from './created.entity'
-import { DeletedColumns } from './deleted.entity'
 import { UpdatedColumns } from './updated.entity'
 import { ArchivableEntity } from './archivable.entity'
 
@@ -17,7 +16,4 @@ export abstract class FullAuditableEntity extends ArchivableEntity {
 
 	@Column(() => UpdatedColumns, { prefix: false })
 	updated: UpdatedColumns
-
-	@Column(() => DeletedColumns, { prefix: false })
-	deleted: DeletedColumns
 }

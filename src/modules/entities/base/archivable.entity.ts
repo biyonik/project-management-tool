@@ -1,13 +1,11 @@
-import { Column, DeleteDateColumn } from 'typeorm'
+import { Column } from 'typeorm'
 import { BaseEntity } from './base.entity'
 import { ArchiveStatus } from 'src/common/enums/archive-status.enum'
+import { DeletedColumns } from './deleted.entity'
 
 export abstract class ArchivableEntity extends BaseEntity {
-	@DeleteDateColumn({ name: 'deleted_at', nullable: true })
-	deletedAt?: Date
-
-	@Column({ name: 'deleted_by', nullable: true })
-	deletedBy?: string
+	@Column(() => DeletedColumns, { prefix: false })
+	deleted: DeletedColumns
 
 	@Column({ name: 'deletion_reason', nullable: true })
 	deletionReason?: string

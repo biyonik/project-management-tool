@@ -14,15 +14,11 @@ import { UserRepository } from './user.repository'
 import FindAllParams from 'src/common/params/find-all.params'
 import { CachedList } from 'src/common/interfaces/cached-list.interface'
 import { SuccessPaginatedDataResponse } from 'src/common/dto/success-paginated-response.dto'
-import {
-	ValidateUniqueEmailForCreate,
-	ValidateUniqueEmailForUpdate,
-} from 'src/common/decorators/validation/unique-email.decorator'
+import { ValidateUniqueEmailForUpdate } from 'src/common/decorators/validation/unique-email.decorator'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { LocaleProvider } from '../../common/i18n/locale.provider'
 import { UserCreatedEvent } from './events/user-created.event'
-import { EventDispatcher } from 'src/common/events/event-dispatcher.service'
 import { UserUpdatedEvent } from './events/user-updated.event'
 import { IApiEventResponse } from 'src/common/interfaces/api-event.response.interface'
 
@@ -31,7 +27,6 @@ export class UserService extends BaseService<UserEntity> {
 	locale: string
 	constructor(
 		private readonly userRepository: UserRepository,
-		private readonly eventDispatcher: EventDispatcher,
 		cacheService: CacheService,
 		messageSource: MessageSourceService,
 		auditLogService: AuditLogService,
@@ -102,12 +97,27 @@ export class UserService extends BaseService<UserEntity> {
 		}
 	}
 
-	@ValidateUniqueEmailForCreate()
+	private async checkEmailExists(email: string): Promise<boolean> {
+		const user = await this.userRepository.findByEmail(email)
+		return !!user
+	}
+
 	async createUser(
 		dto: CreateUserDto,
 		userId: string,
 	): Promise<IApiEventResponse> {
 		try {
+			const emailIsExists = await this.checkEmailExists(dto.email)
+			if (emailIsExists) {
+				return ErrorResponse.of(
+					HttpStatus.BAD_REQUEST.toString(),
+					this.messageSource.getMessage(
+						'user.email.exists',
+						this.getLocale(),
+					),
+				)
+			}
+
 			const user = await this.userRepository.create(dto)
 
 			return {
@@ -218,15 +228,5 @@ export class UserService extends BaseService<UserEntity> {
 				this.messageSource.getMessage('user.profile.not.found'),
 			)
 		}
-	}
-
-	private async invalidateCache(id?: string): Promise<void> {
-		const promises = [this.cacheService.clear('users:list:*')]
-
-		if (id) {
-			promises.push(this.cacheService.delete(`user:${id}`))
-		}
-
-		await Promise.all(promises)
 	}
 }
