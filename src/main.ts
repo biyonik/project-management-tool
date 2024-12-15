@@ -6,8 +6,11 @@ import { MessageSourceService } from './common/i18n/message-source.service'
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule)
+
 	app.useGlobalInterceptors(new LocaleInterceptor())
-	app.useGlobalPipes(new I18nValidationPipe(new MessageSourceService()))
+
+	const messageSourceService = app.get(MessageSourceService)
+	app.useGlobalPipes(new I18nValidationPipe(messageSourceService))
 
 	await app.listen(3000)
 }

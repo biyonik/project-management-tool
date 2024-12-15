@@ -18,6 +18,8 @@ import * as Joi from 'joi'
 import { ResponseInterceptor } from 'src/common/interceptors/response.interceptor'
 import { I18nModule } from 'src/common/i18n/i18n.module'
 import { AuditLogModule } from '../base/audit-log/audit-log.module'
+import { EventDispatcherInterceptor } from 'src/common/interceptors/event-dispatch.interceptor'
+import { EventDispatcher } from 'src/common/events/event-dispatcher.service'
 
 @Module({
 	imports: [
@@ -66,6 +68,7 @@ import { AuditLogModule } from '../base/audit-log/audit-log.module'
 	],
 	controllers: [AppController],
 	providers: [
+		EventDispatcher,
 		{
 			provide: APP_FILTER,
 			useClass: GlobalExceptionFilter,
@@ -73,6 +76,10 @@ import { AuditLogModule } from '../base/audit-log/audit-log.module'
 		{
 			provide: APP_INTERCEPTOR,
 			useClass: ResponseInterceptor,
+		},
+		{
+			provide: APP_INTERCEPTOR,
+			useClass: EventDispatcherInterceptor,
 		},
 		ExceptionHandlerRegistry,
 		GlobalExceptionHandlers,

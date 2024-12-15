@@ -48,7 +48,7 @@ export class UserController {
 
 	@Post()
 	async create(@Body() data: CreateUserDto): Promise<IApiResponse> {
-		const result = await this.userService.create(data, '')
+		const result = await this.userService.createUser(data, '')
 		return result
 	}
 

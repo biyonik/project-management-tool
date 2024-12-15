@@ -24,6 +24,7 @@ import { LocaleProvider } from '../../common/i18n/locale.provider'
 import { UserCreatedEvent } from './events/user-created.event'
 import { EventDispatcher } from 'src/common/events/event-dispatcher.service'
 import { UserUpdatedEvent } from './events/user-updated.event'
+import { IApiEventResponse } from 'src/common/interfaces/api-event.response.interface'
 
 @Injectable()
 export class UserService extends BaseService<UserEntity> {
@@ -105,15 +106,14 @@ export class UserService extends BaseService<UserEntity> {
 	async createUser(
 		dto: CreateUserDto,
 		userId: string,
-	): Promise<IApiResponse> {
+	): Promise<IApiEventResponse> {
 		try {
 			const user = await this.userRepository.create(dto)
 
-			await this.eventDispatcher.publish(
-				new UserCreatedEvent(user, userId),
-			)
-
-			return SuccessDataResponse.of(user)
+			return {
+				...SuccessDataResponse.of(user),
+				events: [new UserCreatedEvent(user, userId)],
+			}
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
@@ -131,15 +131,14 @@ export class UserService extends BaseService<UserEntity> {
 		id: string,
 		dto: UpdateUserDto,
 		userId: string,
-	): Promise<IApiResponse> {
+	): Promise<IApiEventResponse> {
 		try {
 			const user = await this.userRepository.update(id, dto)
 
-			await this.eventDispatcher.publish(
-				new UserUpdatedEvent(user, dto, userId),
-			)
-
-			return SuccessDataResponse.of(user)
+			return {
+				...SuccessDataResponse.of(user),
+				events: [new UserUpdatedEvent(user, dto, userId)],
+			}
 		} catch (error) {
 			return ErrorResponse.of(
 				HttpStatus.NOT_FOUND.toString(),
