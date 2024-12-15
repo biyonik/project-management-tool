@@ -21,12 +21,16 @@ import {
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { LocaleProvider } from '../../common/i18n/locale.provider'
+import { UserCreatedEvent } from './events/user-created.event'
+import { EventDispatcher } from 'src/common/events/event-dispatcher.service'
+import { UserUpdatedEvent } from './events/user-updated.event'
 
 @Injectable()
 export class UserService extends BaseService<UserEntity> {
 	locale: string
 	constructor(
 		private readonly userRepository: UserRepository,
+		private readonly eventDispatcher: EventDispatcher,
 		cacheService: CacheService,
 		messageSource: MessageSourceService,
 		auditLogService: AuditLogService,
@@ -98,48 +102,55 @@ export class UserService extends BaseService<UserEntity> {
 	}
 
 	@ValidateUniqueEmailForCreate()
-	async create(
-		createUserDto: CreateUserDto,
+	async createUser(
+		dto: CreateUserDto,
 		userId: string,
 	): Promise<IApiResponse> {
-		const result = await super.create(createUserDto, userId)
+		try {
+			const user = await this.userRepository.create(dto)
 
-		if (result instanceof SuccessDataResponse) {
-			await this.invalidateCache()
-			return SuccessDataResponse.of(
-				result.data,
-				this.messageSource.getMessage('user.create.succeed'),
+			await this.eventDispatcher.publish(
+				new UserCreatedEvent(user, userId),
+			)
+
+			return SuccessDataResponse.of(user)
+		} catch (error) {
+			return ErrorResponse.of(
+				HttpStatus.INTERNAL_SERVER_ERROR.toString(),
+				this.messageSource.getMessage(
+					'user.created.failed',
+					this.getLocale(),
+				),
+				error,
 			)
 		}
-
-		return ErrorResponse.of(
-			HttpStatus.INTERNAL_SERVER_ERROR.toString(),
-			this.messageSource.getMessage('user.create.failed'),
-		)
 	}
 
 	@ValidateUniqueEmailForUpdate()
-	async update(
+	async updateUser(
 		id: string,
-		updateUserDto: UpdateUserDto,
+		dto: UpdateUserDto,
 		userId: string,
 	): Promise<IApiResponse> {
-		const result = await super.update(id, updateUserDto, userId)
+		try {
+			const user = await this.userRepository.update(id, dto)
 
-		if (result instanceof SuccessDataResponse) {
-			await this.invalidateCache(id)
-			return SuccessDataResponse.of(
-				result.data,
-				this.messageSource.getMessage('user.update.succeed'),
+			await this.eventDispatcher.publish(
+				new UserUpdatedEvent(user, dto, userId),
+			)
+
+			return SuccessDataResponse.of(user)
+		} catch (error) {
+			return ErrorResponse.of(
+				HttpStatus.NOT_FOUND.toString(),
+				this.messageSource.getMessage(
+					'user.not.found',
+					this.getLocale(),
+				),
+				error,
 			)
 		}
-
-		return ErrorResponse.of(
-			HttpStatus.NOT_FOUND.toString(),
-			this.messageSource.getMessage('user.update.failed'),
-		)
 	}
-
 	async findActiveUsers({
 		page,
 		limit,
